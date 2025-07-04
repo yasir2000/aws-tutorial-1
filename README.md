@@ -60,6 +60,40 @@ Set these in your environment or a `.env` file:
 - `SNS_TOPIC` - SNS topic name
 - `SQS_QUEUE` - SQS queue name
 
+## Use AWS CLI to create the neccessary resources on LocalStack
+```bash
+aws dynamodb create-table --table-name $USERS_TABLE \
+  --attribute-definitions AttributeName=id,AttributeType=S \
+  --key-schema AttributeName=id,KeyType=HASH \
+  --provisioned-throughput ReadCapacityUnits=1,WriteCapacityUnits=1 \
+  --endpoint-url=http://localhost:4566 --region $AWS_REGION
+
+aws dynamodb create-table --table-name $PRODUCTS_TABLE \
+  --attribute-definitions AttributeName=id,AttributeType=S \
+  --key-schema AttributeName=id,KeyType=HASH \
+  --provisioned-throughput ReadCapacityUnits=1,WriteCapacityUnits=1 \
+  --endpoint-url=http://localhost:4566 --region $AWS_REGION
+
+aws dynamodb create-table --table-name $ORDERS_TABLE \
+  --attribute-definitions AttributeName=id,AttributeType=S \
+  --key-schema AttributeName=id,KeyType=HASH \
+  --provisioned-throughput ReadCapacityUnits=1,WriteCapacityUnits=1 \
+  --endpoint-url=http://localhost:4566 --region $AWS_REGION
+```
+
+Create SNS Topic
+
+```bash
+aws sns create-topic --name $SNS_TOPIC \
+  --endpoint-url=http://localhost:4566 --region $AWS_REGION
+```
+
+Create SQS Topic
+```bash
+aws sqs create-queue --queue-name $SQS_QUEUE \
+  --endpoint-url=http://localhost:4566 --region $AWS_REGION
+```
+
 ## Useful Commands
 - Deploy to AWS:
   ```bash
