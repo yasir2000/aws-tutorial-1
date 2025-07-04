@@ -94,6 +94,108 @@ aws sqs create-queue --queue-name $SQS_QUEUE \
   --endpoint-url=http://localhost:4566 --region $AWS_REGION
 ```
 
+## Using AWS CLI with LocalStack
+
+To use AWS CLI commands with LocalStack, follow these steps:
+
+1. **Start LocalStack**
+   ```bash
+   docker-compose up -d
+   ```
+
+2. **Set Dummy AWS Credentials**
+   LocalStack does not require real AWS credentials, but the AWS CLI expects them to be set:
+   ```bash
+   export AWS_ACCESS_KEY_ID=test
+   export AWS_SECRET_ACCESS_KEY=test
+   ```
+   Or add them to your `.env` file.
+
+3. **Always Use the LocalStack Endpoint**
+   Add `--endpoint-url=http://localhost:4566` to all AWS CLI commands. Example:
+   ```bash
+   aws dynamodb list-tables --endpoint-url=http://localhost:4566 --region us-east-1
+   ```
+
+4. **Create Resources Example**
+   ```bash
+   aws dynamodb create-table --table-name users \
+     --attribute-definitions AttributeName=id,AttributeType=S \
+     --key-schema AttributeName=id,KeyType=HASH \
+     --provisioned-throughput ReadCapacityUnits=1,WriteCapacityUnits=1 \
+     --endpoint-url=http://localhost:4566 --region us-east-1
+
+   aws sns create-topic --name my-sns-topic --endpoint-url=http://localhost:4566 --region us-east-1
+   aws sqs create-queue --queue-name my-sqs-queue --endpoint-url=http://localhost:4566 --region us-east-1
+   ```
+
+5. **Troubleshooting**
+   - Check LocalStack logs: `docker logs localstack`
+   - Make sure port 4566 is open and not blocked.
+   - If using Git Bash, ensure AWS CLI is in your PATH.
+
+**Tip:** You can script these commands in a file (e.g., `init-localstack.sh`) for convenience.
+
+## Deploying and Testing the API Locally
+
+After creating the resources on LocalStack, follow these steps to deploy and test your API:
+
+### 1. Deploy Locally with Serverless Offline
+
+Make sure you have the Serverless Framework and serverless-offline plugin installed:
+```bash
+npm install -g serverless
+npm install --save-dev serverless-offline
+```
+
+Start the local API Gateway and Lambda emulation:
+```bash
+serverless offline
+```
+This will start your API on a local port (usually http://localhost:3000).
+
+### 2. Test the API Endpoints
+
+You can use `curl`, Postman, or any HTTP client to test your endpoints. Example using `curl`:
+
+**Create a user:**
+```bash
+curl -X POST http://localhost:3000/users \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"John Doe","email":"john@example.com","age":30,"phone":"+1234567890"}'
+```
+
+**Get a user:**
+```bash
+curl http://localhost:3000/users/{userId}
+```
+
+**Update a user:**
+```bash
+curl -X PUT http://localhost:3000/users/{userId} \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"Jane Doe","email":"jane@example.com","age":28,"phone":"+1234567890"}'
+```
+
+**Delete a user:**
+```bash
+curl -X DELETE http://localhost:3000/users/{userId}
+```
+
+### 3. Run Automated Tests
+
+You can also run the included Jest tests:
+```bash
+npm test
+```
+
+---
+
+**Tip:**
+- Check the Serverless Offline output for the exact URLs and ports.
+- Make sure your environment variables are set or your `.env` file is loaded.
+- You can use Postman for more advanced API testing.
+
 ## Useful Commands
 - Deploy to AWS:
   ```bash

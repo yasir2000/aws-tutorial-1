@@ -7,10 +7,9 @@ provider:
   region: us-east-1
   environment:
     USERS_TABLE: ${self:service}-users-${sls:stage}
-    ORDERS_TABLE: ${self:service}-products-${sls:stage}
+    ORDERS_TABLE: ${self:service}-orders-${sls:stage}
     SNS_TOPIC: ${self:service}-events-${sls:stage}
     SQS_QUEUE: ${self:service}-notifications-${sls:stage}
-    COGNITO_CLIENT_ID: ${self:custom.cognitoClientId}
   iamRoleStatements:
     - Effect: Allow
       Action:
@@ -24,7 +23,6 @@ provider:
         - sqs:SendMessage
         - sqs:ReceiveMessage
         - sqs:DeleteMessage
-        - cognito-idp:AdminCreateUser
       Resource: "*"
 functions:
   createUser:
@@ -41,9 +39,6 @@ functions:
           path: users/{id}
           method: get
           cors: true
-          authorizer: 
-            type: COGNITO_USER_POOLS
-            authorizerId: ${self:custom.authorizerId}
   updateUser:
     handler: handlers/user.update
     events:
@@ -51,9 +46,6 @@ functions:
           path: users/{id}
           method: put
           cors: true
-          authorizer: 
-            type: COGNITO_USER_POOLS
-            authorizerId: ${self:custom.authorizerId}
   deleteUser:
     handler: handlers/user.delete
     events:
@@ -61,9 +53,6 @@ functions:
           path: users/{id}
           method: delete
           cors: true
-          authorizer: 
-            type: COGNITO_USER_POOLS
-            authorizerId: ${self:custom.authorizerId}
   # Product Management
   createProduct:
     handler: handlers/product.create
@@ -72,9 +61,6 @@ functions:
           path: products
           method: post
           cors: true
-          authorizer: 
-            type: COGNITO_USER_POOLS
-            authorizerId: ${self:custom.authorizerId}
   getProducts:
     handler: handlers/product.getAll
     events:
@@ -96,9 +82,6 @@ functions:
           path: products/{id}
           method: put
           cors: true
-          authorizer: 
-            type: COGNITO_USER_POOLS
-            authorizerId: ${self:custom.authorizerId}
   deleteProduct:
     handler: handlers/product.delete
     events:
@@ -106,9 +89,6 @@ functions:
           path: products/{id}
           method: delete
           cors: true
-          authorizer: 
-            type: COGNITO_USER_POOLS
-            authorizerId: ${self:custom.authorizerId}
   # Order Management
   createOrder:
     handler: handlers/order.create
@@ -117,9 +97,6 @@ functions:
           path: orders
           method: post
           cors: true
-          authorizer: 
-            type: COGNITO_USER_POOLS
-            authorizerId: ${self:custom.authorizerId}
   getOrders:
     handler: handlers/order.getAll
     events:
@@ -127,106 +104,56 @@ functions:
           path: orders
           method: get
           cors: true
-          authorizer: 
-            type: COGNITO_USER_POOLS
-            authorizerId: ${self:custom.authorizerId}
 # Event Processors
   processNotification:
     handler: handlers/notification.process
     events:
       - sqs:
           arn: arn:aws:sqs:${self:provider.region}:*:${self:provider.environment.SQS_QUEUE}
-  resources:
-    Resources:
-      UsersTable:
-        Type: AWS::DynamoDB::Table
-        Properties:
-          TableName: ${self:provider.environment.USERS_TABLE}
-          AttributeDefinitions:
-            - AttributeName: id
-              AttributeType: S
-          KeySchema:
-            - AttributeName: id
-              KeyType: HASH
-          BillingMode: PAY_PER_REQUEST
-      ProductsTable:
-        Type: AWS::DynamoDB::Table
-        Properties:
-          TableName: ${self:provider.environment.PRODUCTS_TABLE}
-          AttributeDefinitions:
-            - AttributeName: id
-              AttributeType: S
-          KeySchema:
-            - AttributeName: id
-              KeyType: HASH
-          BillingMode: PAY_PER_REQUEST
-      OrdersTable:
-        Type: AWS::DynamoDB::Table
-        Properties:
-          TableName: ${self:provider.environment.ORDERS_TABLE}
-          AttributeDefinitions:
-            - AttributeName: id
-              AttributeType: S
-          KeySchema:
-            - AttributeName: id
-              KeyType: HASH
-          BillingMode: PAY_PER_REQUEST
-      # SNS Topic
-      EventsTopic:
-        Type: AWS::SNS::Topic
-        Properties:
-          TopicName: ${self:provider.environment.SNS_TOPIC}
-      # SQS Queue
-      NotificationsQueue:
-        Type: AWS::SQS::Queue
-        Properties:
-          QueueName: ${self:provider.environment.SQS_QUEUE}
-      # SNS to SQS Subscription
-      NotificationsSubscription:
-        Type: AWS::SNS::Subscription
-        Properties:
-          TopicArn: !Ref EventsTopic
-          Protocol: sqs
-          Endpoint: !GetAtt NotificationsQueue.Arn
-      # Cognito User Pool
-      CognitoUserPool:
-        Type: AWS::Cognito::UserPool
-        Properties:
-          UserPoolName: ${self:service}-user-pool-${sls:stage}
-          UsernameAttributes:
-            - email
-          AutoVerifiedAttributes:
-            - email
-          Policies:
-            PasswordPolicy:
-              MinimumLength: 8
-              RequireUppercase: true
-              RequireLowercase: true
-              RequireNumbers: true
-              RequireSymbols: true
-      CognitoUserPoolClient:
-        Type: AWS::Cognito::UserPoolClient
-        Properties:
-          ClientName: ${self:service}-client-${sls:stage}
-          UserPoolId: !Ref CognitoUserPool
-          GenerateSecret: false
-          ExplicitAuthFlows:
-            - ADMIN_NO_SRP_AUTH
-            - USER_PASSWORD_AUTH
-    # API Gateway Authorizer
-      CognitoAuthorizer:
-        Type: AWS::ApiGateway::Authorizer
-        Properties:
-          Name: CognitoAuthorizer
-          Type: COGNITO_USER_POOLS
-          RestApiId: !Ref ApiGatewayRestApi
-          ProviderARNs:
-            - !GetAtt CognitoUserPool.Arn
-          IdentitySource: method.request.header.Authorization
-    custom:
-      authorizerId: !Ref CognitoAuthorizer
-      cognitoClientId: !Ref CognitoUserPoolClient
-      cognitoUserPoolId: !Ref CognitoUserPool
-  plugins:
-    - serverless-offline
-    
+resources:
+  Resources:
+    UsersTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.USERS_TABLE}
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+    ProductsTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:service}-products-${sls:stage}
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+    OrdersTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: ${self:provider.environment.ORDERS_TABLE}
+        AttributeDefinitions:
+          - AttributeName: id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: id
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+    # SNS Topic
+    EventsTopic:
+      Type: AWS::SNS::Topic
+      Properties:
+        TopicName: ${self:provider.environment.SNS_TOPIC}
+    # SQS Queue
+    NotificationsQueue:
+      Type: AWS::SQS::Queue
+      Properties:
+        QueueName: ${self:provider.environment.SQS_QUEUE}
+plugins:
+  - serverless-offline
