@@ -4,10 +4,13 @@ This project demonstrates a serverless CRUD microservices architecture using AWS
 
 ## Features
 - User, Product, Order, and Notification microservices
+- **AWS S3 File Storage** - Upload, download, list, and delete files with LocalStack support
+- **JWT Authentication & Authorization** - Secure API access with user-scoped permissions
 - Input validation with Joi
-- Authentication and authorization utilities (bypassed for local development)
 - Messaging with SNS and SQS (mocked for local development)
 - Local development with in-memory database mocking
+- **LocalStack Integration** - Full local AWS service emulation
+- **In-Memory Fallback** - Mock storage when LocalStack unavailable
 - Unit tests with Jest
 
 ## Project Structure
@@ -17,17 +20,23 @@ handlers/         # Lambda function handlers for each microservice
   products.js     # Product CRUD operations  
   orders.js       # Order CRUD operations
   notifications.js# Event processing
+  auth.js         # Authentication (signup, signin, profile)
+  files.js        # File storage operations (S3 integration)
 utils/            # Shared utility modules
   dynamodb.js     # Database operations (with local mocking)
   messaging.js    # SNS/SQS operations (with local mocking)
   mockdb.js       # In-memory database for local development
+  mockAuth.js     # In-memory authentication for local development
   validation.js   # Joi validation schemas
   response.js     # HTTP response utilities
   extractUser.js  # User extraction utilities
+  auth.js         # JWT token handling
+  s3.js           # S3 operations with LocalStack support
 tests/            # Jest test files
 serverless.yml    # Serverless Framework configuration
 package.json      # Project dependencies and scripts
 docker-compose.yml# Local AWS service emulation (optional)
+S3_INTEGRATION.md # Detailed S3 integration documentation
 ```
 
 ## Quick Start
@@ -122,6 +131,27 @@ docker-compose.yml# Local AWS service emulation (optional)
 - **Create Order:** `POST http://localhost:3000/dev/orders`
 - **Get All Orders:** `GET http://localhost:3000/dev/orders`
 
+### Files & S3 Storage (Requires Authentication*)
+- **Upload File:** `POST http://localhost:3000/dev/files/upload`
+  ```bash
+  curl -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+    -X POST http://localhost:3000/dev/files/upload \
+    -H "Content-Type: application/json" \
+    -d '{"fileName":"document.txt","fileContent":"SGVsbG8gV29ybGQ=","contentType":"text/plain"}'
+  ```
+
+- **List Files:** `GET http://localhost:3000/dev/files?userOnly=true`
+  ```bash
+  curl -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+    "http://localhost:3000/dev/files?userOnly=true"
+  ```
+
+- **Download File:** `GET http://localhost:3000/dev/files/{key}`
+- **Delete File:** `DELETE http://localhost:3000/dev/files/{key}`
+- **Generate Upload URL:** `POST http://localhost:3000/dev/files/upload-url`
+
+_See detailed S3 integration guide in `S3_INTEGRATION.md`_
+
 *_Note: Authentication is enforced in production but bypassed in local development for easier testing._
 
 ## Local Development Features
@@ -208,42 +238,418 @@ If you need to switch Node.js versions:
 
 ## Testing the API
 
-### Example Test Workflow
+### Complete Step-by-Step Examples
 
-1. **Start the server:**
-   ```bash
-   serverless offline
-   ```
+#### 1. Start the Development Server
+```bash
+# Navigate to project directory
+cd aws-tutorial-1
 
-2. **Sign up a new user:**
-   ```bash
-   curl -X POST http://localhost:3000/dev/auth/signup \
-     -H "Content-Type: application/json" \
-     -d '{"email":"testuser@example.com","password":"TestPass123","name":"Test User"}'
-   ```
-   
-   _Save the returned JWT token for authenticated requests._
+# Set environment variables (choose your platform)
+# For Git Bash/WSL:
+export AWS_ACCESS_KEY_ID=test
+export AWS_SECRET_ACCESS_KEY=test
+export IS_OFFLINE=true
 
-3. **Create a user (authenticated):**
-   ```bash
-   curl -H "Authorization: Bearer YOUR_JWT_TOKEN" \
-     -X POST http://localhost:3000/dev/users \
-     -H "Content-Type: application/json" \
-     -d '{"name":"John Doe","email":"john@example.com","age":30,"phone":"+1234567890"}'
-   ```
+# For Windows Command Prompt:
+set AWS_ACCESS_KEY_ID=test
+set AWS_SECRET_ACCESS_KEY=test
+set IS_OFFLINE=true
 
-4. **Create a product (authenticated):**
-   ```bash
-   curl -H "Authorization: Bearer YOUR_JWT_TOKEN" \
-     -X POST http://localhost:3000/dev/products \
-     -H "Content-Type: application/json" \
-     -d '{"name":"Test Product","description":"A test product","price":29.99,"category":"Electronics"}'
-   ```
+# For PowerShell:
+$env:AWS_ACCESS_KEY_ID="test"
+$env:AWS_SECRET_ACCESS_KEY="test"
+$env:IS_OFFLINE="true"
 
-5. **Get all products (public):**
-   ```bash
-   curl http://localhost:3000/dev/products
-   ```
+# Start the serverless offline server
+serverless offline
+```
+
+Wait for the server to start. You should see output like:
+```
+Server ready: http://localhost:3003 🚀
+```
+
+#### 2. Authentication Flow
+
+**Step 2.1: Sign Up a New User**
+```bash
+curl -X POST http://localhost:3003/dev/auth/signup \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "testuser@example.com",
+    "password": "TempPass123!",
+    "name": "Test User"
+  }'
+```
+
+**Expected Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "message": "User created successfully",
+    "user": {
+      "id": "49b38958-0c49-4bb3-919b-6d40b4c66177",
+      "email": "testuser@example.com",
+      "name": "Test User"
+    },
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "needsConfirmation": false
+  }
+}
+```
+
+**Step 2.2: Save the JWT Token**
+Copy the token from the response above and save it as an environment variable:
+```bash
+# Save the token for future requests
+export JWT_TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+```
+
+**Step 2.3: Test Authentication with Profile**
+```bash
+curl -X GET http://localhost:3003/dev/auth/profile \
+  -H "Authorization: Bearer $JWT_TOKEN"
+```
+
+**Expected Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "user": {
+      "userId": "49b38958-0c49-4bb3-919b-6d40b4c66177",
+      "email": "testuser@example.com",
+      "name": "Test User"
+    }
+  }
+}
+```
+
+#### 3. User Management Examples
+
+**Step 3.1: Create a User Profile**
+```bash
+curl -X POST http://localhost:3003/dev/users \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $JWT_TOKEN" \
+  -d '{
+    "name": "John Doe",
+    "email": "john@example.com",
+    "age": 30,
+    "phone": "+1234567890"
+  }'
+```
+
+**Expected Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "id": "user-123-456",
+    "name": "John Doe",
+    "email": "john@example.com",
+    "age": 30,
+    "phone": "+1234567890",
+    "createdAt": "2025-01-05T20:30:00.000Z",
+    "updatedAt": "2025-01-05T20:30:00.000Z"
+  }
+}
+```
+
+**Step 3.2: Get User Profile (save the user ID from step 3.1)**
+```bash
+# Replace USER_ID with the actual ID from the create response
+export USER_ID="user-123-456"
+
+curl -X GET http://localhost:3003/dev/users/$USER_ID \
+  -H "Authorization: Bearer $JWT_TOKEN"
+```
+
+**Step 3.3: Update User Profile**
+```bash
+curl -X PUT http://localhost:3003/dev/users/$USER_ID \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $JWT_TOKEN" \
+  -d '{
+    "name": "John Smith",
+    "email": "johnsmith@example.com",
+    "age": 31,
+    "phone": "+1234567891"
+  }'
+```
+
+#### 4. Product Management Examples
+
+**Step 4.1: Create Products**
+```bash
+# Create first product
+curl -X POST http://localhost:3003/dev/products \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $JWT_TOKEN" \
+  -d '{
+    "name": "Laptop",
+    "description": "High-performance laptop for developers",
+    "price": 1299.99,
+    "category": "Electronics"
+  }'
+
+# Create second product
+curl -X POST http://localhost:3003/dev/products \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $JWT_TOKEN" \
+  -d '{
+    "name": "Wireless Mouse",
+    "description": "Ergonomic wireless mouse",
+    "price": 29.99,
+    "category": "Electronics"
+  }'
+```
+
+**Step 4.2: List All Products (Public - No Authentication Required)**
+```bash
+curl -X GET http://localhost:3003/dev/products
+```
+
+**Step 4.3: Get Specific Product (save product ID from step 4.1)**
+```bash
+export PRODUCT_ID="product-123-456"
+
+curl -X GET http://localhost:3003/dev/products/$PRODUCT_ID
+```
+
+**Step 4.4: Update Product**
+```bash
+curl -X PUT http://localhost:3003/dev/products/$PRODUCT_ID \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $JWT_TOKEN" \
+  -d '{
+    "name": "Gaming Laptop",
+    "description": "High-performance gaming laptop",
+    "price": 1499.99,
+    "category": "Gaming"
+  }'
+```
+
+#### 5. Order Management Examples
+
+**Step 5.1: Create Orders**
+```bash
+# Create first order
+curl -X POST http://localhost:3003/dev/orders \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $JWT_TOKEN" \
+  -d '{
+    "userId": "'$USER_ID'",
+    "productId": "'$PRODUCT_ID'",
+    "quantity": 1,
+    "totalAmount": 1499.99
+  }'
+
+# Create second order
+curl -X POST http://localhost:3003/dev/orders \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $JWT_TOKEN" \
+  -d '{
+    "userId": "'$USER_ID'",
+    "productId": "another-product-id",
+    "quantity": 2,
+    "totalAmount": 59.98
+  }'
+```
+
+**Step 5.2: List All Orders**
+```bash
+curl -X GET http://localhost:3003/dev/orders \
+  -H "Authorization: Bearer $JWT_TOKEN"
+```
+
+#### 6. File Storage Examples (S3 Integration)
+
+**Step 6.1: Upload a File**
+```bash
+# Create base64 encoded content
+echo "Hello from S3 test file!" | base64 > /tmp/content.txt
+CONTENT=$(cat /tmp/content.txt)
+
+# Upload the file
+curl -X POST http://localhost:3003/dev/files/upload \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $JWT_TOKEN" \
+  -d '{
+    "fileName": "test-document.txt",
+    "fileContent": "'$CONTENT'",
+    "contentType": "text/plain",
+    "metadata": {
+      "description": "Test file upload",
+      "category": "documents"
+    }
+  }'
+```
+
+**Expected Response:**
+```json
+{
+  "success": true,
+  "data": {
+    "message": "File uploaded successfully",
+    "file": {
+      "key": "uploads/49b38958-0c49-4bb3-919b-6d40b4c66177/1751732678214-test-document.txt",
+      "originalName": "test-document.txt",
+      "location": "http://localhost:3000/mock-s3/uploads/...",
+      "contentType": "text/plain",
+      "uploadedBy": "49b38958-0c49-4bb3-919b-6d40b4c66177",
+      "uploadedAt": "2025-01-05T20:30:00.000Z"
+    }
+  }
+}
+```
+
+**Step 6.2: List User's Files**
+```bash
+curl -X GET "http://localhost:3003/dev/files?userOnly=true&maxKeys=10" \
+  -H "Authorization: Bearer $JWT_TOKEN"
+```
+
+**Step 6.3: Download a File (save the file key from step 6.1)**
+```bash
+export FILE_KEY="uploads/49b38958-0c49-4bb3-919b-6d40b4c66177/1751732678214-test-document.txt"
+
+curl -X GET "http://localhost:3003/dev/files/$FILE_KEY" \
+  -H "Authorization: Bearer $JWT_TOKEN"
+```
+
+**Step 6.4: Generate Presigned Upload URL**
+```bash
+curl -X POST http://localhost:3003/dev/files/upload-url \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $JWT_TOKEN" \
+  -d '{
+    "fileName": "large-document.pdf",
+    "contentType": "application/pdf",
+    "expiresIn": 3600
+  }'
+```
+
+**Step 6.5: Delete a File**
+```bash
+curl -X DELETE "http://localhost:3003/dev/files/$FILE_KEY" \
+  -H "Authorization: Bearer $JWT_TOKEN"
+```
+
+#### 7. Complete Test Script
+
+Create a file called `test-api.sh` with all the commands:
+
+```bash
+#!/bin/bash
+
+# Set base URL
+BASE_URL="http://localhost:3003/dev"
+
+echo "🚀 Starting API Test Suite..."
+
+# 1. Sign up
+echo "📝 1. Creating user account..."
+SIGNUP_RESPONSE=$(curl -s -X POST $BASE_URL/auth/signup \
+  -H "Content-Type: application/json" \
+  -d '{"email":"demo@example.com","password":"DemoPass123!","name":"Demo User"}')
+
+echo "✅ Signup Response: $SIGNUP_RESPONSE"
+
+# Extract token
+JWT_TOKEN=$(echo $SIGNUP_RESPONSE | jq -r '.data.token')
+echo "🔑 JWT Token extracted: ${JWT_TOKEN:0:50}..."
+
+# 2. Create user profile
+echo "👤 2. Creating user profile..."
+USER_RESPONSE=$(curl -s -X POST $BASE_URL/users \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $JWT_TOKEN" \
+  -d '{"name":"Demo User","email":"demo@example.com","age":25,"phone":"+1234567890"}')
+
+echo "✅ User Created: $USER_RESPONSE"
+
+# Extract user ID
+USER_ID=$(echo $USER_RESPONSE | jq -r '.data.id')
+
+# 3. Create product
+echo "📦 3. Creating product..."
+PRODUCT_RESPONSE=$(curl -s -X POST $BASE_URL/products \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $JWT_TOKEN" \
+  -d '{"name":"Demo Product","description":"A demo product","price":99.99,"category":"Demo"}')
+
+echo "✅ Product Created: $PRODUCT_RESPONSE"
+
+# Extract product ID
+PRODUCT_ID=$(echo $PRODUCT_RESPONSE | jq -r '.data.id')
+
+# 4. List products
+echo "📋 4. Listing all products..."
+curl -s -X GET $BASE_URL/products | jq .
+
+# 5. Create order
+echo "🛒 5. Creating order..."
+ORDER_RESPONSE=$(curl -s -X POST $BASE_URL/orders \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $JWT_TOKEN" \
+  -d "{\"userId\":\"$USER_ID\",\"productId\":\"$PRODUCT_ID\",\"quantity\":1,\"totalAmount\":99.99}")
+
+echo "✅ Order Created: $ORDER_RESPONSE"
+
+# 6. Upload file
+echo "📁 6. Uploading file..."
+CONTENT=$(echo "Hello from API test!" | base64)
+FILE_RESPONSE=$(curl -s -X POST $BASE_URL/files/upload \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer $JWT_TOKEN" \
+  -d "{\"fileName\":\"test.txt\",\"fileContent\":\"$CONTENT\",\"contentType\":\"text/plain\"}")
+
+echo "✅ File Uploaded: $FILE_RESPONSE"
+
+# 7. List files
+echo "📂 7. Listing user files..."
+curl -s -X GET "$BASE_URL/files?userOnly=true" \
+  -H "Authorization: Bearer $JWT_TOKEN" | jq .
+
+echo "🎉 API Test Suite Completed!"
+```
+
+Make it executable and run:
+```bash
+chmod +x test-api.sh
+./test-api.sh
+```
+
+#### 8. Browser Testing
+
+You can also test GET endpoints directly in your browser:
+
+1. **View all products:** http://localhost:3003/dev/products
+2. **Health check:** http://localhost:3003/dev/health (if implemented)
+
+#### 9. Troubleshooting Test Issues
+
+**Problem: "Unauthorized" errors**
+- Make sure you're using the correct JWT token
+- Check that the token hasn't expired
+- Verify the Authorization header format: `Bearer <token>`
+
+**Problem: "User not found" errors**
+- Make sure you're using the correct user ID from the creation response
+- Check that the user was created successfully
+
+**Problem: Connection refused**
+- Verify serverless offline is running on the correct port
+- Check for port conflicts (try port 3003 if 3000 is busy)
+
+**Problem: Base64 encoding issues**
+- For Windows: `powershell -command "[Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes('Hello World'))"`
+- For Linux/Mac: `echo "Hello World" | base64`
+
+This completes the comprehensive step-by-step testing guide for your AWS CRUD microservices with S3 integration! 🎯
 
 ### Using in Browser
 

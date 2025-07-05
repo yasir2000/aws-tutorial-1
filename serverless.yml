@@ -16,6 +16,8 @@ provider:
     COGNITO_USER_POOL_ID: !Ref CognitoUserPool
     COGNITO_CLIENT_ID: !Ref CognitoUserPoolClient
     JWT_SECRET: ${env:JWT_SECRET, 'local-development-secret'}
+    S3_BUCKET: ${self:service}-files-${sls:stage}
+    S3_ENDPOINT: ${env:S3_ENDPOINT, ''}
   iamRoleStatements:
     - Effect: Allow
       Action:
@@ -29,6 +31,10 @@ provider:
         - sqs:SendMessage
         - sqs:ReceiveMessage
         - sqs:DeleteMessage
+        - s3:GetObject
+        - s3:PutObject
+        - s3:DeleteObject
+        - s3:ListBucket
       Resource: "*"
 functions:
   # Authentication functions
@@ -180,6 +186,58 @@ functions:
             name: CognitoAuthorizer
             type: COGNITO_USER_POOLS
             arn: !GetAtt CognitoUserPool.Arn
+  # File Management
+  uploadFile:
+    handler: handlers/files.upload
+    events:
+      - http:
+          path: files/upload
+          method: post
+          cors: true
+          authorizer:
+            name: CognitoAuthorizer
+            type: COGNITO_USER_POOLS
+            arn: !GetAtt CognitoUserPool.Arn
+  getFile:
+    handler: handlers/files.getFile
+    events:
+      - http:
+          path: files/{key}
+          method: get
+          cors: true
+  listFiles:
+    handler: handlers/files.listFiles
+    events:
+      - http:
+          path: files
+          method: get
+          cors: true
+          authorizer:
+            name: CognitoAuthorizer
+            type: COGNITO_USER_POOLS
+            arn: !GetAtt CognitoUserPool.Arn
+  deleteFile:
+    handler: handlers/files.deleteFile
+    events:
+      - http:
+          path: files/{key}
+          method: delete
+          cors: true
+          authorizer:
+            name: CognitoAuthorizer
+            type: COGNITO_USER_POOLS
+            arn: !GetAtt CognitoUserPool.Arn
+  generateUploadUrl:
+    handler: handlers/files.generateUploadUrl
+    events:
+      - http:
+          path: files/upload-url
+          method: post
+          cors: true
+          authorizer:
+            name: CognitoAuthorizer
+            type: COGNITO_USER_POOLS
+            arn: !GetAtt CognitoUserPool.Arn
 # Event Processors
   processNotification:
     handler: handlers/notifications.process
@@ -276,6 +334,30 @@ resources:
       Properties:
         QueueName: ${self:provider.environment.SQS_QUEUE}
 
+    # S3 Bucket for file storage
+    FilesBucket:
+      Type: AWS::S3::Bucket
+      Properties:
+        BucketName: ${self:provider.environment.S3_BUCKET}
+        CorsConfiguration:
+          CorsRules:
+            - AllowedHeaders:
+                - "*"
+              AllowedMethods:
+                - GET
+                - POST
+                - PUT
+                - DELETE
+                - HEAD
+              AllowedOrigins:
+                - "*"
+              MaxAge: 3000
+        PublicAccessBlockConfiguration:
+          BlockPublicAcls: false
+          BlockPublicPolicy: false
+          IgnorePublicAcls: false
+          RestrictPublicBuckets: false
+
   Outputs:
     CognitoUserPoolId:
       Value: !Ref CognitoUserPool
@@ -291,9 +373,17 @@ resources:
       Value: !GetAtt CognitoUserPool.Arn
       Export:
         Name: ${self:service}-${sls:stage}-UserPoolArn
+    
+    S3BucketName:
+      Value: !Ref FilesBucket
+      Export:
+        Name: ${self:service}-${sls:stage}-S3BucketName
 custom:
   isProduction: ${opt:stage, 'dev'}
   enableAuth: ${self:custom.isProduction, 'false'}
+  serverless-offline:
+    httpPort: 3003
+    lambdaPort: 3004
 
 plugins:
   - serverless-offline
