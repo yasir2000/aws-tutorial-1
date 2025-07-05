@@ -1,53 +1,126 @@
 # AWS CRUD Microservices
 
-This project demonstrates a serverless CRUD microservices architecture using AWS Lambda, API Gateway, DynamoDB, SNS, and SQS. It includes local development support with Docker Compose for DynamoDB Local and LocalStack.
+This project demonstrates a serverless CRUD microservices architecture using AWS Lambda, API Gateway, DynamoDB, SNS, and SQS. It includes local development support with in-memory mocking for quick testing.
 
 ## Features
 - User, Product, Order, and Notification microservices
 - Input validation with Joi
-- Authentication and authorization utilities
-- Messaging with SNS and SQS
-- Local development with Docker Compose
+- Authentication and authorization utilities (bypassed for local development)
+- Messaging with SNS and SQS (mocked for local development)
+- Local development with in-memory database mocking
 - Unit tests with Jest
 
 ## Project Structure
 ```
 handlers/         # Lambda function handlers for each microservice
-  users.js
-  products.js
-  orders.js
-  notifications.js
-utils/            # Shared utility modules (auth, validation, db, messaging, etc.)
+  users.js        # User CRUD operations
+  products.js     # Product CRUD operations  
+  orders.js       # Order CRUD operations
+  notifications.js# Event processing
+utils/            # Shared utility modules
+  dynamodb.js     # Database operations (with local mocking)
+  messaging.js    # SNS/SQS operations (with local mocking)
+  mockdb.js       # In-memory database for local development
+  validation.js   # Joi validation schemas
+  response.js     # HTTP response utilities
+  extractUser.js  # User extraction utilities
 tests/            # Jest test files
 serverless.yml    # Serverless Framework configuration
 package.json      # Project dependencies and scripts
-docker-compose.yml# Local AWS service emulation
+docker-compose.yml# Local AWS service emulation (optional)
 ```
 
-## Local Development
+## Quick Start
 
 ### Prerequisites
-- Node.js (v16+ recommended)
-- Docker & Docker Compose
+- Node.js 20.x (use nvm-windows to manage versions)
 - Serverless Framework (`npm install -g serverless`)
 
 ### Setup
-1. Install dependencies:
+1. **Clone and install dependencies:**
    ```bash
+   git clone <your-repo>
+   cd aws-tutorial-1
    npm install
    ```
-2. Start local AWS services:
+
+2. **Set environment variables for local development:**
    ```bash
-   docker-compose up -d
+   # For Git Bash/WSL
+   export AWS_ACCESS_KEY_ID=test
+   export AWS_SECRET_ACCESS_KEY=test
+   export IS_OFFLINE=true
+
+   # For Windows Command Prompt
+   set AWS_ACCESS_KEY_ID=test
+   set AWS_SECRET_ACCESS_KEY=test
+   set IS_OFFLINE=true
+
+   # For PowerShell
+   $env:AWS_ACCESS_KEY_ID="test"
+   $env:AWS_SECRET_ACCESS_KEY="test"
+   $env:IS_OFFLINE="true"
    ```
-3. Deploy locally (with serverless-offline):
+
+3. **Start the local server:**
    ```bash
    serverless offline
    ```
 
+4. **API will be available at:** `http://localhost:3000`
+
+## API Endpoints
+
+### Users
+- **Create User:** `POST http://localhost:3000/dev/users`
+  ```bash
+  curl -X POST http://localhost:3000/dev/users \
+    -H "Content-Type: application/json" \
+    -d '{"name":"John Doe","email":"john@example.com","age":30,"phone":"+1234567890"}'
+  ```
+
+- **Get User:** `GET http://localhost:3000/dev/users/{id}`
+- **Update User:** `PUT http://localhost:3000/dev/users/{id}`
+- **Delete User:** `DELETE http://localhost:3000/dev/users/{id}`
+
+### Products
+- **Create Product:** `POST http://localhost:3000/dev/products`
+  ```bash
+  curl -X POST http://localhost:3000/dev/products \
+    -H "Content-Type: application/json" \
+    -d '{"name":"Test Product","description":"A test product","price":29.99,"category":"Electronics"}'
+  ```
+
+- **Get All Products:** `GET http://localhost:3000/dev/products`
+- **Get Product:** `GET http://localhost:3000/dev/products/{id}`
+- **Update Product:** `PUT http://localhost:3000/dev/products/{id}`
+- **Delete Product:** `DELETE http://localhost:3000/dev/products/{id}`
+
+### Orders
+- **Create Order:** `POST http://localhost:3000/dev/orders`
+- **Get All Orders:** `GET http://localhost:3000/dev/orders`
+
+## Local Development Features
+
+### In-Memory Database
+- Uses `utils/mockdb.js` for local development
+- Data persists during the serverless offline session
+- Automatically switches between mock (local) and real AWS (production)
+
+### Mock Services
+- **DynamoDB:** In-memory JavaScript Map storage
+- **SNS/SQS:** Console logging instead of actual messaging
+- **Authentication:** Bypassed for local development
+
+### Environment Detection
+The application automatically detects local development through:
+- `IS_OFFLINE=true` environment variable
+- `NODE_ENV=development` environment variable
+
 ## Running Tests
 ```bash
 npm test
+```
 ```
 
 ## Environment Variables

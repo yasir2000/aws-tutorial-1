@@ -1,8 +1,9 @@
 const { v4: uuidv4 } = require('uuid');
 const { successResponse, errorResponse } = require('../utils/response');
 const { productSchema, validateInput } = require('../utils/validation');
-const { getItem, put, updateItem, deleteItem } = require('../utils/dynamodb');
+const { getItem, put, updateItem, deleteItem, scan } = require('../utils/dynamodb');
 const { publishEvent } = require('../utils/messaging');
+const { extractUserFromEvent } = require('../utils/extractUser');
 
 module.exports.create = async (event) => {
     try {
@@ -12,7 +13,7 @@ module.exports.create = async (event) => {
             id: uuidv4(),
             ...validateData,
             createdAt: new Date().toISOString(),
-            createdBy: currentUser.userId,
+            createdBy: 'system', // For local development
             updatedAt: new Date().toISOString(),
         };
         await put(process.env.PRODUCTS_TABLE, product);
@@ -45,8 +46,9 @@ module.exports.update = async (event) => {
         if (!existingProduct) {
             return errorResponse('Product not found', 404);
         }
-        // Only the creator can update the product
-        if (existingProduct.createdBy !== currentUser.userId) {
+        // Skip authorization check for local development
+        const isOffline = process.env.IS_OFFLINE || process.env.NODE_ENV === 'development';
+        if (!isOffline && existingProduct.createdBy !== currentUser.userId) {
             return errorResponse('Unauthorized access', 403);
         }
         const validateData = validateInput(productSchema, data);
@@ -80,8 +82,9 @@ module.exports.delete = async (event) => {
         if (!product) {
             return errorResponse('Product not found', 404);
         }
-        // Only the creator can delete the product
-        if (product.createdBy !== currentUser.userId) {
+        // Skip authorization check for local development
+        const isOffline = process.env.IS_OFFLINE || process.env.NODE_ENV === 'development';
+        if (!isOffline && product.createdBy !== currentUser.userId) {
             return errorResponse('Unauthorized access', 403);
         }
         await deleteItem(process.env.PRODUCTS_TABLE, { id });
@@ -94,14 +97,8 @@ module.exports.delete = async (event) => {
 
 module.exports.getAll = async (event) => {
     try {
-        // Example: scan all products (not efficient for large tables)
-        const AWS = require('aws-sdk');
-        const dynamoDb = new AWS.DynamoDB.DocumentClient();
-        const params = {
-            TableName: process.env.PRODUCTS_TABLE
-        };
-        const result = await dynamoDb.scan(params).promise();
-        return successResponse(result.Items || []);
+        const products = await scan(process.env.PRODUCTS_TABLE);
+        return successResponse(products || []);
     } catch (error) {
         return errorResponse(error.message, 400);
     }

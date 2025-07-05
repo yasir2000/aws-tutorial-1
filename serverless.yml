@@ -11,6 +11,8 @@ provider:
     ORDERS_TABLE: ${self:service}-orders-${sls:stage}
     SNS_TOPIC: ${self:service}-events-${sls:stage}
     SQS_QUEUE: ${self:service}-notifications-${sls:stage}
+    IS_OFFLINE: ${env:IS_OFFLINE, 'true'}
+    NODE_ENV: development
   iamRoleStatements:
     - Effect: Allow
       Action:

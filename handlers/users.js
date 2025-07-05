@@ -30,6 +30,10 @@ module.exports.get = async(event) => {
         if (currentuser.userId !== id) {
             return errorResponse('Unauthorized access', 404);
         }
+        const user = await getItem(process.env.USERS_TABLE, {id});
+        if (!user) {
+            return errorResponse('User not found', 404);
+        }
         return successResponse(user);
     } catch (error) {
         return errorResponse(error.message, 400);
@@ -45,19 +49,23 @@ module.exports.update = async(event) => {
             return errorResponse('Unauthorized access', 403);
         }
         const validateData = validateInput(userSchema, data);
-        const updateExpression = 'SET #name = :name, email = :email, age = :age, phone = :phone, updateAt = :updateAt';
+        const updateExpression = 'SET #name = :name, email = :email, age = :age, phone = :phone, updatedAt = :updatedAt';
         const expressionAttributeNames = {
+            '#name': 'name'
+        };
+        const expressionAttributeValues = {
             ':name': validateData.name,
             ':email': validateData.email,
             ':age': validateData.age,
             ':phone': validateData.phone,
-            ':updateAt': new Date().toISOString(),
+            ':updatedAt': new Date().toISOString(),
         };
         const updateUser = await updateItem(
-            process.env.USER_TABLE,
+            process.env.USERS_TABLE,
             {id},
             updateExpression,
-            expressionAttributevalues
+            expressionAttributeValues,
+            expressionAttributeNames
         );
         
         await publishEvent('USER_UPDATED', updateUser);
@@ -74,11 +82,11 @@ module.exports.delete = async(event) => {
         if (currentuser.userId !== id) {
             return errorResponse('Unauthorized access', 403);
         }
-        const user = await getItem(process.env.USER_TABLE, {id});
+        const user = await getItem(process.env.USERS_TABLE, {id});
         if (!user){
             return errorResponse('User not found', 404);
         }
-        await deleteItem(process.env.USER_TABLE, {id});
+        await deleteItem(process.env.USERS_TABLE, {id});
         await publishEvent('USER_DELETED', user);
         return successResponse({ message: 'user deleted successfully' });
 
