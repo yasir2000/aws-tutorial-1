@@ -681,6 +681,60 @@ Open your browser and visit:
 
 ## Production Deployment
 
+### 🏗️ **Terraform Infrastructure as Code (Recommended)**
+
+**Complete production-ready deployment using Terraform with all 8 AWS services.**
+
+**📦 What Gets Deployed:**
+- **22 Lambda Functions** (Auth, CRUD, File management, Notifications)
+- **API Gateway REST API** with complete endpoint configuration
+- **3 DynamoDB Tables** with backups and encryption
+- **Cognito User Pool & Client** with security policies
+- **S3 Bucket** with encryption, versioning, and lifecycle policies
+- **SNS Topic** for event publishing
+- **SQS Queue + Dead Letter Queue** for reliable messaging
+- **CloudWatch** logs, dashboard, and alarms
+
+**🚀 Quick Start:**
+```bash
+# Navigate to terraform directory
+cd terraform
+
+# Configure deployment variables
+cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars with your settings
+
+# Deploy infrastructure
+terraform init
+terraform plan
+terraform apply
+
+# Get API URL and important outputs
+terraform output api_gateway_url
+terraform output deployment_summary
+```
+
+**💰 Production Cost (estimated monthly):**
+- **Lambda**: $5-15 (1M requests)
+- **API Gateway**: $3.50 (1M requests)
+- **DynamoDB**: $10-25 (pay-per-request)
+- **S3**: $0.023/GB + requests
+- **Other services**: $5-10
+- **Total: ~$25-75/month** for moderate usage
+
+**🔧 Key Production Features:**
+- Automatic scaling and high availability
+- CloudWatch monitoring and alerting
+- Security best practices implemented
+- Backup and disaster recovery
+- Cost optimization settings
+
+See `/terraform/README.md` for detailed deployment guide.
+
+---
+
+### 🔄 **Alternative: Serverless Framework Deployment**
+
 ### 🚀 **AWS Deployment Process**
 
 **Prerequisites:**
