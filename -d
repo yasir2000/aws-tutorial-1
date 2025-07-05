@@ -1,0 +1,1 @@
+{"currentRoute":"post - /users","error":"Serverless-offline: route not found.","existingRoutes":["get - /dev/orders","post - /dev/orders","get - /dev/products","post - /dev/products","delete - /dev/products/{id}","put - /dev/products/{id}","get - /dev/products/{id}","post - /dev/users","delete - /dev/users/{id}","put - /dev/users/{id}","get - /dev/users/{id}"],"statusCode":404}

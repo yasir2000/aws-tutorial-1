@@ -12,7 +12,7 @@ dynamoDB.get(params).promise();
   return result.Item;
 };
 
-const putItem = async (tableName, item) => {
+const put = async (tableName, item) => {
   const params = {
     TableName: tableName,
     Item: item,
@@ -40,7 +40,7 @@ const updateItem = async (tableName, key, updateExpression, expressionAttributeV
 };
   module.exports ={
     getItem,
-    putItem,
+    put,
     updateItem,
     deleteItem  }
 };

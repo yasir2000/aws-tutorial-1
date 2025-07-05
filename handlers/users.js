@@ -2,7 +2,7 @@ const { v4: uuidv4} = require('uuid');
 const { successResponse, createdResponse, errorResponse } = require('../utils/response');
 const { userSchema, validateInput } = require('../utils/validation');
 const { extractUserFromEvent } = require('../utils/extractUser');
-const { getItem, putItem, updateItem, deleteItem } = require('../utils/dynamodb');
+const { getItem, put, updateItem, deleteItem } = require('../utils/dynamodb');
 const { publishEvent} = require('../utils/messaging');
 
 module.exports.create = async(event) => {
@@ -15,7 +15,7 @@ module.exports.create = async(event) => {
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
         };
-        await putItem(process.env.USERS_TABLE, user);
+        await put(process.env.USERS_TABLE, user);
         await publishEvent('UserCreated', user);
         return createdResponse(user);
     } catch (error) {

@@ -1,6 +1,6 @@
 
 jest.mock('../utils/dynamodb', () => ({
-  putItem: jest.fn().mockResolvedValue({}),
+  put: jest.fn().mockResolvedValue({}),
   getItem: jest.fn(),
   updateItem: jest.fn(),
   deleteItem: jest.fn()

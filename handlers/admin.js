@@ -1,6 +1,6 @@
 const { successResponse, errorResponse } = require('../utils/response');
 const { extractUserFromEvent } = require('../utils/auth');
-const { getItem, putItem, updateItem } = require('../utils/dynamodb');
+const { getItem, put, updateItem } = require('../utils/dynamodb');
 const AWS = require('aws-sdk');
 
 const dynamoDb = new AWS.DynamoDB.DocumentClient();

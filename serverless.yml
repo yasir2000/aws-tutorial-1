@@ -6,6 +6,7 @@ provider:
   runtime: nodejs18.x
   region: us-east-1
   environment:
+    PRODUCTS_TABLE: ${self:service}-products-${sls:stage}
     USERS_TABLE: ${self:service}-users-${sls:stage}
     ORDERS_TABLE: ${self:service}-orders-${sls:stage}
     SNS_TOPIC: ${self:service}-events-${sls:stage}
@@ -15,7 +16,7 @@ provider:
       Action:
         - dynamodb:Query
         - dynamodb:Scan 
-        - dynamodb:PutItem
+        - dynamodb:put
         - dynamodb:GetItem
         - dynamodb:UpdateItem
         - dynamodb:DeleteItem
@@ -26,7 +27,7 @@ provider:
       Resource: "*"
 functions:
   createUser:
-    handler: handlers/user.create
+    handler: handlers/users.create
     events:
       - http:
           path: users
@@ -40,14 +41,14 @@ functions:
           method: get
           cors: true
   updateUser:
-    handler: handlers/user.update
+    handler: handlers/users.update
     events:
       - http:
           path: users/{id}
           method: put
           cors: true
   deleteUser:
-    handler: handlers/user.delete
+    handler: handlers/users.delete
     events:
       - http:
           path: users/{id}
@@ -55,35 +56,35 @@ functions:
           cors: true
   # Product Management
   createProduct:
-    handler: handlers/product.create
+    handler: handlers/products.create
     events:
       - http:
           path: products
           method: post
           cors: true
   getProducts:
-    handler: handlers/product.getAll
+    handler: handlers/products.getAll
     events:
       - http:
           path: products
           method: get
           cors: true
   getProduct:
-    handler: handlers/product.get
+    handler: handlers/products.get
     events:
       - http:
           path: products/{id}
           method: get
           cors: true
   updateProduct:
-    handler: handlers/product.update
+    handler: handlers/products.update
     events:
       - http:
           path: products/{id}
           method: put
           cors: true
   deleteProduct:
-    handler: handlers/product.delete
+    handler: handlers/products.delete
     events:
       - http:
           path: products/{id}
@@ -91,14 +92,14 @@ functions:
           cors: true
   # Order Management
   createOrder:
-    handler: handlers/order.create
+    handler: handlers/orders.create
     events:
       - http:
           path: orders
           method: post
           cors: true
   getOrders:
-    handler: handlers/order.getAll
+    handler: handlers/orders.getAll
     events:
       - http:
           path: orders
@@ -106,7 +107,7 @@ functions:
           cors: true
 # Event Processors
   processNotification:
-    handler: handlers/notification.process
+    handler: handlers/notifications.process
     events:
       - sqs:
           arn: arn:aws:sqs:${self:provider.region}:*:${self:provider.environment.SQS_QUEUE}
