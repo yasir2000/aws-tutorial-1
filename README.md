@@ -127,97 +127,132 @@ npm test
 Set these in your environment or a `.env` file:
 - `USERS_TABLE` - DynamoDB table name for users
 - `PRODUCTS_TABLE` - DynamoDB table name for products
-- `ORDERS_TABLE` - DynamoDB table name for orders
-- `AWS_REGION` - AWS region (e.g., us-east-1)
-- `AWS_ACCOUNT_ID` - Your AWS account ID (for LocalStack)
-- `SNS_TOPIC` - SNS topic name
-- `SQS_QUEUE` - SQS queue name
+## Troubleshooting
 
-## Use AWS CLI to create the neccessary resources on LocalStack
-```bash
-aws dynamodb create-table --table-name $USERS_TABLE \
-  --attribute-definitions AttributeName=id,AttributeType=S \
-  --key-schema AttributeName=id,KeyType=HASH \
-  --provisioned-throughput ReadCapacityUnits=1,WriteCapacityUnits=1 \
-  --endpoint-url=http://localhost:4566 --region $AWS_REGION
+### Common Issues
 
-aws dynamodb create-table --table-name $PRODUCTS_TABLE \
-  --attribute-definitions AttributeName=id,AttributeType=S \
-  --key-schema AttributeName=id,KeyType=HASH \
-  --provisioned-throughput ReadCapacityUnits=1,WriteCapacityUnits=1 \
-  --endpoint-url=http://localhost:4566 --region $AWS_REGION
-
-aws dynamodb create-table --table-name $ORDERS_TABLE \
-  --attribute-definitions AttributeName=id,AttributeType=S \
-  --key-schema AttributeName=id,KeyType=HASH \
-  --provisioned-throughput ReadCapacityUnits=1,WriteCapacityUnits=1 \
-  --endpoint-url=http://localhost:4566 --region $AWS_REGION
-```
-
-Create SNS Topic
-
-```bash
-aws sns create-topic --name $SNS_TOPIC \
-  --endpoint-url=http://localhost:4566 --region $AWS_REGION
-```
-
-Create SQS Topic
-```bash
-aws sqs create-queue --queue-name $SQS_QUEUE \
-  --endpoint-url=http://localhost:4566 --region $AWS_REGION
-```
-
-## Using AWS CLI with LocalStack
-
-To use AWS CLI commands with LocalStack, follow these steps:
-
-1. **Start LocalStack**
+1. **"Missing credentials in config" Error**
    ```bash
-   docker-compose up -d
-   ```
-
-2. **Set Dummy AWS Credentials**
-   LocalStack does not require real AWS credentials, but the AWS CLI expects them to be set:
-   ```bash
+   # Set dummy AWS credentials before starting serverless offline
    export AWS_ACCESS_KEY_ID=test
    export AWS_SECRET_ACCESS_KEY=test
+   export IS_OFFLINE=true
    ```
-   Or add them to your `.env` file.
 
-3. **Always Use the LocalStack Endpoint**
-   Add `--endpoint-url=http://localhost:4566` to all AWS CLI commands. Example:
+2. **Port Already in Use**
    ```bash
-   aws dynamodb list-tables --endpoint-url=http://localhost:4566 --region us-east-1
+   # Kill existing Node.js processes
+   taskkill //F //IM node.exe  # Windows
+   # Or use a different port
+   serverless offline --httpPort 3001
    ```
 
-4. **Create Resources Example**
+3. **Java Not Found (DynamoDB Local)**
+   - This project uses in-memory mocking instead of DynamoDB Local
+   - No Java installation required for local development
+
+4. **Empty Results from GET Endpoints**
+   - Data is stored in-memory during the serverless offline session
+   - Create some data first using POST endpoints
+   - Data is lost when serverless offline is restarted
+
+### Node.js Version Management (Windows)
+
+If you need to switch Node.js versions:
+
+1. **Install nvm-windows:**
+   - Download from: https://github.com/coreybutler/nvm-windows/releases
+   - Install the `.exe` file
+
+2. **Use Node.js 20.x:**
    ```bash
-   aws dynamodb create-table --table-name users \
-     --attribute-definitions AttributeName=id,AttributeType=S \
-     --key-schema AttributeName=id,KeyType=HASH \
-     --provisioned-throughput ReadCapacityUnits=1,WriteCapacityUnits=1 \
-     --endpoint-url=http://localhost:4566 --region us-east-1
-
-   aws sns create-topic --name my-sns-topic --endpoint-url=http://localhost:4566 --region us-east-1
-   aws sqs create-queue --queue-name my-sqs-queue --endpoint-url=http://localhost:4566 --region us-east-1
+   nvm install 20.19.3
+   nvm use 20.19.3
    ```
 
-5. **Troubleshooting**
-   - Check LocalStack logs: `docker logs localstack`
-   - Make sure port 4566 is open and not blocked.
-   - If using Git Bash, ensure AWS CLI is in your PATH.
+3. **Verify installation:**
+   ```bash
+   node --version  # Should show v20.x.x
+   npm --version
+   ```
 
-**Tip:** You can script these commands in a file (e.g., `init-localstack.sh`) for convenience.
+## Testing the API
 
-## Deploying and Testing the API Locally
+### Example Test Workflow
 
-After creating the resources on LocalStack, follow these steps to deploy and test your API:
+1. **Start the server:**
+   ```bash
+   serverless offline
+   ```
 
-### 1. Deploy Locally with Serverless Offline
+2. **Create a user:**
+   ```bash
+   curl -X POST http://localhost:3000/dev/users \
+     -H "Content-Type: application/json" \
+     -d '{"name":"John Doe","email":"john@example.com","age":30,"phone":"+1234567890"}'
+   ```
 
-Make sure you have the Serverless Framework and serverless-offline plugin installed:
-```bash
-npm install -g serverless
+3. **Create a product:**
+   ```bash
+   curl -X POST http://localhost:3000/dev/products \
+     -H "Content-Type: application/json" \
+     -d '{"name":"Test Product","description":"A test product","price":29.99,"category":"Electronics"}'
+   ```
+
+4. **Get all products:**
+   ```bash
+   curl http://localhost:3000/dev/products
+   ```
+
+### Using in Browser
+
+Open your browser and visit:
+- `http://localhost:3000/dev/products` - Get all products
+- `http://localhost:3000/dev/orders` - Get all orders
+
+## Production Deployment
+
+For production deployment to AWS:
+
+1. **Remove local development flags:**
+   - Remove `IS_OFFLINE` and `NODE_ENV` environment variables
+   - Ensure real AWS credentials are configured
+
+2. **Deploy to AWS:**
+   ```bash
+   serverless deploy --stage production
+   ```
+
+3. **The application will automatically use:**
+   - Real AWS DynamoDB tables
+   - Real SNS/SQS services
+   - Proper authentication/authorization
+
+## Architecture
+
+```
+┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
+│   API Gateway   │ -> │  Lambda Functions │ -> │   DynamoDB      │
+└─────────────────┘    └──────────────────┘    └─────────────────┘
+                               |
+                               v
+                    ┌──────────────────┐
+                    │   SNS/SQS        │
+                    │   (Messaging)    │
+                    └──────────────────┘
+```
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test locally with `serverless offline`
+5. Submit a pull request
+
+## License
+
+MIT License
 npm install --save-dev serverless-offline
 ```
 
