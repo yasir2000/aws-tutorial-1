@@ -71,36 +71,66 @@ docker-compose.yml# Local AWS service emulation (optional)
 
 ## API Endpoints
 
-### Users
+### Authentication (New!)
+- **Sign Up:** `POST http://localhost:3000/dev/auth/signup`
+  ```bash
+  curl -X POST http://localhost:3000/dev/auth/signup \
+    -H "Content-Type: application/json" \
+    -d '{"email":"user@example.com","password":"TestPass123","name":"John Doe"}'
+  ```
+
+- **Sign In:** `POST http://localhost:3000/dev/auth/signin`
+  ```bash
+  curl -X POST http://localhost:3000/dev/auth/signin \
+    -H "Content-Type: application/json" \
+    -d '{"email":"user@example.com","password":"TestPass123"}'
+  ```
+
+- **Get Profile:** `GET http://localhost:3000/dev/auth/profile` (Requires JWT token)
+  ```bash
+  curl -H "Authorization: Bearer YOUR_JWT_TOKEN" http://localhost:3000/dev/auth/profile
+  ```
+
+### Users (Requires Authentication*)
 - **Create User:** `POST http://localhost:3000/dev/users`
   ```bash
-  curl -X POST http://localhost:3000/dev/users \
+  curl -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+    -X POST http://localhost:3000/dev/users \
     -H "Content-Type: application/json" \
     -d '{"name":"John Doe","email":"john@example.com","age":30,"phone":"+1234567890"}'
   ```
 
-- **Get User:** `GET http://localhost:3000/dev/users/{id}`
-- **Update User:** `PUT http://localhost:3000/dev/users/{id}`
-- **Delete User:** `DELETE http://localhost:3000/dev/users/{id}`
+- **Get User:** `GET http://localhost:3000/dev/users/{id}` (Requires Authentication*)
+- **Update User:** `PUT http://localhost:3000/dev/users/{id}` (Requires Authentication*)
+- **Delete User:** `DELETE http://localhost:3000/dev/users/{id}` (Requires Authentication*)
 
 ### Products
-- **Create Product:** `POST http://localhost:3000/dev/products`
+- **Create Product:** `POST http://localhost:3000/dev/products` (Requires Authentication*)
   ```bash
-  curl -X POST http://localhost:3000/dev/products \
+  curl -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+    -X POST http://localhost:3000/dev/products \
     -H "Content-Type: application/json" \
     -d '{"name":"Test Product","description":"A test product","price":29.99,"category":"Electronics"}'
   ```
 
-- **Get All Products:** `GET http://localhost:3000/dev/products`
-- **Get Product:** `GET http://localhost:3000/dev/products/{id}`
-- **Update Product:** `PUT http://localhost:3000/dev/products/{id}`
-- **Delete Product:** `DELETE http://localhost:3000/dev/products/{id}`
+- **Get All Products:** `GET http://localhost:3000/dev/products` (Public)
+- **Get Product:** `GET http://localhost:3000/dev/products/{id}` (Public)
+- **Update Product:** `PUT http://localhost:3000/dev/products/{id}` (Requires Authentication*)
+- **Delete Product:** `DELETE http://localhost:3000/dev/products/{id}` (Requires Authentication*)
 
-### Orders
+### Orders (Requires Authentication*)
 - **Create Order:** `POST http://localhost:3000/dev/orders`
 - **Get All Orders:** `GET http://localhost:3000/dev/orders`
 
+*_Note: Authentication is enforced in production but bypassed in local development for easier testing._
+
 ## Local Development Features
+
+### AWS Cognito Authentication
+- **Local Development:** Uses JWT tokens with HMAC-SHA256 signing
+- **Production:** Uses AWS Cognito User Pools with RS256 signing
+- **Mock Authentication:** In-memory user storage for local testing
+- **Seamless Switching:** Automatically detects environment and switches auth methods
 
 ### In-Memory Database
 - Uses `utils/mockdb.js` for local development
@@ -110,7 +140,7 @@ docker-compose.yml# Local AWS service emulation (optional)
 ### Mock Services
 - **DynamoDB:** In-memory JavaScript Map storage
 - **SNS/SQS:** Console logging instead of actual messaging
-- **Authentication:** Bypassed for local development
+- **Cognito:** JWT token generation and validation for local development
 
 ### Environment Detection
 The application automatically detects local development through:
@@ -185,21 +215,32 @@ If you need to switch Node.js versions:
    serverless offline
    ```
 
-2. **Create a user:**
+2. **Sign up a new user:**
    ```bash
-   curl -X POST http://localhost:3000/dev/users \
+   curl -X POST http://localhost:3000/dev/auth/signup \
+     -H "Content-Type: application/json" \
+     -d '{"email":"testuser@example.com","password":"TestPass123","name":"Test User"}'
+   ```
+   
+   _Save the returned JWT token for authenticated requests._
+
+3. **Create a user (authenticated):**
+   ```bash
+   curl -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+     -X POST http://localhost:3000/dev/users \
      -H "Content-Type: application/json" \
      -d '{"name":"John Doe","email":"john@example.com","age":30,"phone":"+1234567890"}'
    ```
 
-3. **Create a product:**
+4. **Create a product (authenticated):**
    ```bash
-   curl -X POST http://localhost:3000/dev/products \
+   curl -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+     -X POST http://localhost:3000/dev/products \
      -H "Content-Type: application/json" \
      -d '{"name":"Test Product","description":"A test product","price":29.99,"category":"Electronics"}'
    ```
 
-4. **Get all products:**
+5. **Get all products (public):**
    ```bash
    curl http://localhost:3000/dev/products
    ```

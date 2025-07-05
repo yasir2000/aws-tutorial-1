@@ -10,7 +10,7 @@
     "dependencies": {
         "aws-sdk": "^2.1024.0",
         "joi": "^17.6.0",
-        "jsonwebtoken": "^9.0.0",
+        "jsonwebtoken": "^9.0.2",
         "jwks-rsa": "^3.0.0",
         "uuid": "^8.3.2"
     },
