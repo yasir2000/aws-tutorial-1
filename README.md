@@ -677,16 +677,182 @@ For production deployment to AWS:
 
 ## Architecture
 
+### Complete System Architecture
+
 ```
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
-│   API Gateway   │ -> │  Lambda Functions │ -> │   DynamoDB      │
-└─────────────────┘    └──────────────────┘    └─────────────────┘
-                               |
-                               v
-                    ┌──────────────────┐
-                    │   SNS/SQS        │
-                    │   (Messaging)    │
-                    └──────────────────┘
+                          ┌─────────────────────┐
+                          │     Frontend        │
+                          │   (Web/Mobile)      │
+                          └─────────┬───────────┘
+                                    │ HTTPS/REST
+                                    ▼
+                    ┌─────────────────────────────────┐
+                    │         API Gateway             │
+                    │    (Routes + CORS + Auth)       │
+                    └─────────────┬───────────────────┘
+                                  │
+                    ┌─────────────▼───────────────────┐
+                    │      Cognito Authorizer         │
+                    │     (JWT Token Validation)      │
+                    └─────────────┬───────────────────┘
+                                  │
+              ┌───────────────────┼───────────────────┐
+              │                   │                   │
+              ▼                   ▼                   ▼
+    ┌─────────────────┐ ┌─────────────────┐ ┌─────────────────┐
+    │   Auth Service  │ │ Business Logic  │ │  File Service   │
+    │   (handlers/    │ │   (handlers/    │ │   (handlers/    │
+    │    auth.js)     │ │ users/products/ │ │    files.js)    │
+    │                 │ │   orders.js)    │ │                 │
+    │ • signup        │ │ • CRUD ops      │ │ • upload        │
+    │ • signin        │ │ • validation    │ │ • download      │
+    │ • profile       │ │ • business      │ │ • list/delete   │
+    │ • JWT tokens    │ │   rules         │ │ • presigned URLs│
+    └─────────┬───────┘ └─────────┬───────┘ └─────────┬───────┘
+              │                   │                   │
+              │         ┌─────────▼───────────┐       │
+              │         │   Event Publishing  │       │
+              │         │   (SNS/SQS Mock)    │       │
+              │         │                     │       │
+              │         │ • UserCreated       │       │
+              │         │ • ProductUpdated    │       │
+              │         │ • OrderProcessed    │       │
+              │         └─────────────────────┘       │
+              │                                       │
+              ▼                                       ▼
+    ┌─────────────────┐                    ┌─────────────────┐
+    │  User Storage   │                    │  File Storage   │
+    │   (DynamoDB/    │                    │    (S3 Bucket/  │
+    │   Mock InMemory)│                    │   Mock InMemory)│
+    │                 │                    │                 │
+    │ • Users Table   │                    │ • File Objects  │
+    │ • Products Table│                    │ • Metadata      │
+    │ • Orders Table  │                    │ • User Isolation│
+    │ • JWT Store     │                    │ • Secure Access │
+    └─────────────────┘                    └─────────────────┘
+```
+
+### Microservices Breakdown
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        Lambda Functions                         │
+├─────────────────┬─────────────────┬─────────────────┬───────────┤
+│   Auth Service  │  User Service   │ Product Service │File Service│
+│                 │                 │                 │           │
+│ POST /signup    │ POST /users     │ POST /products  │POST /upload│
+│ POST /signin    │ GET /users/{id} │ GET /products   │GET /files  │
+│ GET /profile    │ PUT /users/{id} │ GET /products/  │GET /files/ │
+│ POST /confirm   │ DELETE /users/  │     {id}        │    {key}   │
+│                 │     {id}        │ PUT /products/  │DELETE /    │
+│                 │                 │     {id}        │files/{key} │
+│                 │                 │ DELETE /products│POST /files/│
+│                 │                 │     /{id}       │upload-url  │
+└─────────────────┴─────────────────┴─────────────────┴───────────┘
+                              │
+                              ▼
+                ┌─────────────────────────────┐
+                │     Notification Service    │
+                │                             │
+                │ • Event Processing          │
+                │ • SQS Message Handling      │
+                │ • Email/SMS Notifications   │
+                │ • Audit Logging             │
+                └─────────────────────────────┘
+```
+
+### Local Development Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Local Development                            │
+│                   (serverless-offline)                         │
+└─────────────────┬───────────────────────────────────────────────┘
+                  │
+    ┌─────────────▼───────────────┐
+    │    Express.js Server        │
+    │   (Port 3003 - HTTP API)    │
+    └─────────────┬───────────────┘
+                  │
+      ┌───────────┼───────────┐
+      │           │           │
+      ▼           ▼           ▼
+┌─────────┐ ┌─────────┐ ┌─────────┐
+│Mock DB  │ │Mock Auth│ │Mock S3  │
+│(In-Mem) │ │(In-Mem) │ │(In-Mem) │
+│         │ │         │ │         │
+│• Users  │ │• JWT    │ │• Files  │
+│• Products│ │• Tokens │ │• Metadata│
+│• Orders │ │• Sessions│ │• Content│
+└─────────┘ └─────────┘ └─────────┘
+```
+
+### Production AWS Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         AWS Cloud                              │
+└─────────────────┬───────────────────────────────────────────────┘
+                  │
+    ┌─────────────▼───────────────┐
+    │        API Gateway          │
+    │   (REST API + Authorizers)   │
+    └─────────────┬───────────────┘
+                  │
+      ┌───────────┼─────────────────────┐
+      │           │                     │
+      ▼           ▼                     ▼
+┌─────────┐ ┌─────────────┐ ┌─────────────────┐
+│Cognito  │ │   Lambda    │ │    S3 Bucket    │
+│User Pool│ │  Functions  │ │                 │
+│         │ │             │ │ • File Storage  │
+│• Users  │ │ • Handlers  │ │ • Static Assets │
+│• Auth   │ │ • Business  │ │ • Backup Data   │
+│• JWT    │ │   Logic     │ │ • CORS Config   │
+└─────────┘ └─────────┬───┘ └─────────────────┘
+                      │
+        ┌─────────────┼─────────────┐
+        │             │             │
+        ▼             ▼             ▼
+┌─────────────┐ ┌─────────────┐ ┌─────────────┐
+│  DynamoDB   │ │   SNS/SQS   │ │ CloudWatch  │
+│             │ │             │ │             │
+│ • Users     │ │ • Events    │ │ • Logs      │
+│ • Products  │ │ • Messages  │ │ • Metrics   │
+│ • Orders    │ │ • Queues    │ │ • Alarms    │
+│ • Indexes   │ │ • Topics    │ │ • Dashboards│
+└─────────────┘ └─────────────┘ └─────────────┘
+```
+
+### Security & Data Flow
+
+```
+┌─────────────┐    JWT Token    ┌─────────────────┐
+│   Client    │ ──────────────> │  API Gateway    │
+│ Application │                 │   + Cognito     │
+└─────────────┘                 │   Authorizer    │
+                                └─────────┬───────┘
+                                          │ Authorized
+                                          ▼
+                              ┌─────────────────────┐
+                              │  Lambda Function    │
+                              │                     │
+                              │ 1. Extract User     │
+                              │ 2. Validate Access  │
+                              │ 3. Process Request  │
+                              │ 4. Return Response  │
+                              └─────────┬───────────┘
+                                        │
+                    ┌───────────────────┼───────────────────┐
+                    │                   │                   │
+                    ▼                   ▼                   ▼
+            ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+            │  DynamoDB   │    │     S3      │    │   SNS/SQS   │
+            │             │    │             │    │             │
+            │• User Data  │    │• File Data  │    │• Events     │
+            │• Scoped     │    │• User       │    │• Async      │
+            │  Access     │    │  Isolation  │    │  Processing │
+            └─────────────┘    └─────────────┘    └─────────────┘
 ```
 
 ## Contributing
