@@ -1,7 +1,7 @@
 {
     "name": "aws-crud-microservices",
     "version": "1.0.0",
-    "description": "CRUD microservices with AWS Lambda, API gateway, DynamoDB, SNS, SQS, Cognito",
+    "description": "Complete serverless CRUD microservices using 8 AWS services: Lambda, API Gateway, DynamoDB, Cognito, S3, SNS, SQS, and CloudWatch",
     "main": "index.js",
     "scripts": {
         "deploy": "serverless deploy",
